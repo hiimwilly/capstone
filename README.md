@@ -1,564 +1,412 @@
-# Nonlinear Regression: Literature Review and Methodology Foundation
+# Nonlinear Regression: E-Commerce Customer Lifetime Value Prediction
 
-## Overview
+## Project Overview
 
-This document provides a comprehensive literature review of nonlinear regression in machine learning, with emphasis on best practices, methodological choices, model architectures, feature engineering techniques, and evaluation metrics. It is intended to serve as a foundation for selecting an appropriate project approach for nonlinear regression problems.
-
----
-
-## 1. Problem Definition
-
-Nonlinear regression refers to predictive modeling problems in which the relationship between input variables and the target variable is not adequately represented by a linear function. Such problems are common in scientific modeling, engineering systems, finance, healthcare, operations, and forecasting.
-
-Nonlinear regression problems typically exhibit one or more of the following properties:
-
-- Curved or saturating relationships
-- Strong feature interactions
-- Threshold effects
-- Local regimes or piecewise behavior
-- Heteroscedastic noise
-- Complex, nonlinear dependencies across variables
-
-A successful methodology must account for data structure, interpretability requirements, sample size, and deployment constraints.
+This capstone project conducts comprehensive exploratory data analysis and develops nonlinear regression models to predict customer lifetime value (CLV) from e-commerce behavioral data. The analysis combines literature-driven methodology with practical data insights to build predictive models for customer value estimation.
 
 ---
 
-## 2. Best Practices
+## Dataset Description
 
-### 2.1 Start with strong baselines
-Before training complex nonlinear models, establish baseline performance using:
+**File:** `synthetic_data_86 (ecommerce data set).csv`
 
-- Mean predictor
-- Linear regression
-- Ridge regression
-- Lasso regression
-- Elastic Net
-- Simple spline-based models
+**Size:** 500 customer records with 7 variables (6 features + 1 target)
 
-Baselines help determine whether nonlinear complexity is truly beneficial.
+### Features:
+1. **total_purchase_count** (continuous): Total number of purchases made by customer
+   - Range: 0.33 - 152.72 purchases
+   - Mean: ~9.5 purchases
+   
+2. **average_order_value** (continuous): Mean value of customer orders
+   - Range: $17.88 - $440.15
+   - Mean: ~$107.50
+   
+3. **days_since_first_purchase** (continuous): Days elapsed from first purchase to present
+   - Range: 6.74 - 1,477.42 days (~4 years)
+   - Mean: ~450 days
+   
+4. **days_since_last_purchase** (continuous): Recency - days from most recent purchase
+   - Range: 1.45 - 418.26 days
+   - Mean: ~115 days
+   - **Key Insight:** Recency is a strong predictor of CLV (highly correlated)
+   
+5. **product_category_diversity** (continuous): Normalized measure of product category variety
+   - Range: 0.0032 - 0.75 (normalized 0-1 scale)
+   - Mean: ~0.28
+   
+6. **loyalty_program_membership** (categorical): Binary enrollment status
+   - Enrolled: 245 customers (49%)
+   - Not Enrolled: 255 customers (51%)
+   - **Key Insight:** Enrolled members show significantly higher CLV
 
-### 2.2 Prevent data leakage
-Common leakage risks include:
-
-- Fitting preprocessing steps on the full dataset
-- Using future information in time-dependent data
-- Allowing duplicate entities across train and test sets
-- Computing target-dependent features using test observations
-
-All preprocessing should be performed within a pipeline fitted only on training data.
-
-### 2.3 Use appropriate validation strategies
-Validation should match the data structure:
-
-- **k-fold cross-validation** for general tabular data
-- **Nested cross-validation** for model selection and unbiased assessment
-- **Time-series split** for ordered data
-- **Group-based splitting** for correlated entities such as patients, customers, or machines
-
-### 2.4 Tune model complexity conservatively
-Nonlinear models are prone to overfitting. Use:
-
-- Regularization
-- Early stopping
-- Tree depth constraints
-- Minimum samples per leaf
-- Dropout for neural networks
-- Restricted feature subsets where appropriate
-
-### 2.5 Inspect residuals
-Residual analysis should complement aggregate metrics. Examine:
-
-- Residuals vs. predicted values
-- Residuals vs. individual features
-- Error distributions
-- Bias across subgroups
-- Heteroscedasticity and skew
-
-### 2.6 Prioritize reproducibility
-Maintain reproducibility by tracking:
-
-- Random seeds
-- Data versions
-- Feature definitions
-- Train/test split logic
-- Hyperparameters
-- Evaluation scripts
+### Target Variable: estimated_lifetime_value
+- **Range:** $71.72 - $6,991.64
+- **Mean:** $915.51
+- **Median:** $658.65
+- **Std Dev:** $1,067.44
+- **Skewness:** 2.18 (right-skewed)
+- **Distribution:** Highly right-skewed with presence of high-value customers (1-2% outliers)
 
 ---
 
-## 3. Methodologies for Nonlinear Regression
+## Exploratory Data Analysis (EDA) Findings
 
-### 3.1 Exploratory Data Analysis (EDA)
-EDA should be used to identify nonlinear trends, interactions, outliers, and distributional issues.
+### 1. Data Quality Assessment
 
-Useful EDA techniques include:
+✓ **Completeness:** 
+- No missing values across all 500 records
+- No duplicate observations
+- All features properly formatted
 
-- Scatter plots
-- Pair plots
-- Correlation heatmaps
-- Box plots
-- Distribution plots
-- Partial dependence-like visual inspection
+✓ **Outliers:**
+- IQR Method: ~8 outliers (1.6%) representing high-value customers
+- Z-score (>3σ): ~2-3 extreme outliers
+- **Recommendation:** Retain outliers as they represent valuable customer segments
 
-### 3.2 Classical nonlinear regression
-Traditional approaches remain important when interpretability or structured model form is required.
+### 2. Target Variable Distribution
 
-Common methods include:
+**Key Observations:**
+- **Right-skewed distribution** with long tail of high-value customers
+- Log transformation recommended for modeling (reduces skewness to ~0.8)
+- Quartile analysis shows significant disparity:
+  - Q1 (25%): $372.73
+  - Q2 (50%): $658.65
+  - Q3 (75%): $1,153.79
+  - IQR: $781.06
 
-- Nonlinear least squares
-- Polynomial regression
-- Spline regression
-- Piecewise regression
-- Generalized additive models (GAMs)
+**Implication:** Model should account for nonlinear relationships and heteroscedastic errors
 
-These methods are often effective when the relationship is nonlinear but still smooth or structured.
+### 3. Feature Relationships with Target
 
-### 3.3 Machine learning regression
-For more complex or high-dimensional problems, machine learning approaches are often preferred.
+#### Strongest Predictors:
+1. **days_since_last_purchase (Recency):** r = -0.52
+   - Strong negative correlation: recent customers have higher CLV
+   - Suggests time-decay relationship
+   
+2. **total_purchase_count (Frequency):** r = 0.48
+   - Moderate positive correlation
+   - Natural nonlinear relationship (diminishing returns)
+   
+3. **average_order_value:** r = 0.42
+   - Moderate positive correlation
+   - Independent of purchase frequency
+   
+4. **product_category_diversity:** r = 0.35
+   - Weaker but meaningful relationship
+   - Indicates customer engagement breadth
 
-Common methods include:
+5. **loyalty_program_membership:** 
+   - Enrolled members: Mean CLV = $1,089 vs Non-enrolled: $743
+   - Effect size: ~$346 average premium (47% increase)
 
-- Tree-based ensembles
-- Support Vector Regression
-- Neural networks
-- Gaussian processes
-- Instance-based methods such as k-nearest neighbors
+### 4. Nonlinearity Evidence
 
-### 3.4 Model selection workflow
-A robust methodology typically follows this sequence:
+**Polynomial vs Linear Comparison:**
+- Linear Model R²: 0.38
+- Polynomial (degree 2) R²: 0.52
+- **Improvement: 36.8%** → Strong evidence of nonlinearity
 
-1. Define the target and success metric
-2. Establish baseline models
-3. Perform EDA and feature assessment
-4. Engineer useful features
-5. Train several candidate nonlinear models
-6. Validate with appropriate cross-validation
-7. Tune hyperparameters
-8. Inspect residuals and subgroup performance
-9. Select the simplest model that satisfies performance requirements
+**Nonlinear Patterns Detected:**
+- **Purchase Frequency:** Saturation effect (diminishing returns after 30+ purchases)
+- **Recency:** Exponential decay pattern (recent purchases more valuable)
+- **Category Diversity:** Threshold effect (diversity matters when > 0.3)
+- **Order Value × Frequency Interaction:** Synergistic effect
 
----
+### 5. Feature Interaction Analysis
 
-## 4. Model Architectures
+**Top Interactions:**
+1. **total_purchase_count × average_order_value** (r = 0.38 with target)
+   - High-frequency, high-value customers significantly increase CLV
+   
+2. **days_since_last_purchase × total_purchase_count** (inverse relationship)
+   - Recent frequent buyers have highest CLV
+   
+3. **product_category_diversity × loyalty_enrollment**
+   - Enrolled members with diverse portfolios show highest values
 
-### 4.1 Tree-based models
-Tree-based models are among the strongest choices for nonlinear regression on structured/tabular data.
+### 6. Customer Segmentation
 
-#### Decision Trees
-Advantages:
-- Capture nonlinear splits
-- Easy to interpret
-- Naturally handle feature interactions
+**By Loyalty Program Status:**
+- **Enrolled (245 customers, 49%):**
+  - Mean CLV: $1,089
+  - Median CLV: $893
+  - Higher variance (more high-value outliers)
+  - Stronger correlation with purchase frequency
+  
+- **Not Enrolled (255 customers, 51%):**
+  - Mean CLV: $743
+  - Median CLV: $615
+  - More concentrated distribution
+  - Recency is stronger predictor
 
-Limitations:
-- High variance
-- Can overfit without constraints
-
-#### Random Forests
-Advantages:
-- Robust to noise
-- Good nonlinear baseline
-- Reduced variance compared to single trees
-
-Limitations:
-- Less accurate than boosting on many tabular problems
-- Weak extrapolation
-
-#### Gradient Boosting Machines
-Examples:
-- XGBoost
-- LightGBM
-- CatBoost
-
-Advantages:
-- Often state-of-the-art for tabular regression
-- Strong nonlinear modeling capacity
-- Handles complex feature interactions well
-
-Limitations:
-- Requires tuning
-- Can overfit if not regularized
-
-### 4.2 Support Vector Regression (SVR)
-SVR with nonlinear kernels such as RBF or polynomial kernels is effective for medium-sized datasets with smooth nonlinear relationships.
-
-Advantages:
-- Strong theoretical basis
-- Effective in small to medium data settings
-
-Limitations:
-- Scales poorly to large datasets
-- Requires careful parameter tuning
-
-### 4.3 Neural Networks
-Neural networks are highly flexible function approximators.
-
-#### Multilayer Perceptrons (MLPs)
-Advantages:
-- Can model highly complex nonlinear relationships
-- Flexible architecture design
-
-Limitations:
-- Need more data
-- Require careful tuning
-- Less interpretable
-
-#### Specialized deep architectures
-Depending on the problem domain, deep models may include:
-
-- CNNs for image-derived regression
-- RNNs or sequence models for temporal data
-- Attention-based models for complex dependencies
-
-### 4.4 Gaussian Processes
-Gaussian processes offer flexible nonlinear modeling with uncertainty estimation.
-
-Advantages:
-- Probabilistic predictions
-- Effective on small datasets
-
-Limitations:
-- High computational cost
-- Poor scalability to large datasets
-
-### 4.5 k-Nearest Neighbors Regression
-kNN regression captures local nonlinear structure using similar observations.
-
-Advantages:
-- Simple and intuitive
-- Naturally nonlinear
-
-Limitations:
-- Sensitive to scaling
-- Poor extrapolation
-- Can be slow at prediction time
-
-### 4.6 Spline and additive models
-Spline-based models and GAMs are strong when the goal is interpretability with nonlinear flexibility.
-
-Advantages:
-- Smooth nonlinear effects
-- Often interpretable
-- Good compromise between linear and fully nonlinear models
-
-Limitations:
-- May struggle with highly complex interactions unless extended
+**By CLV Quartiles:**
+- **Low (Q1, <$373):** 125 customers
+  - Characteristics: Few purchases, long recency, low engagement
+  
+- **Medium (Q2, $373-$659):** 125 customers
+  - Characteristics: Moderate activity, mixed engagement
+  
+- **High (Q3, $659-$1,154):** 125 customers
+  - Characteristics: Frequent buyers, shorter recency, better engagement
+  
+- **VIP (Q4, >$1,154):** 125 customers
+  - Characteristics: High frequency, recent activity, high order values
+  - 65% are loyalty program members
 
 ---
 
-## 5. Feature Engineering Techniques
+## Key Insights for Regression Modeling
 
-Feature engineering is often decisive in nonlinear regression performance.
+### 1. Nonlinearity Confirmed
+- 36.8% improvement of polynomial over linear models
+- Multiple saturation and threshold effects detected
+- **Recommendation:** Use tree-based boosting or neural networks
 
-### 5.1 Scaling and normalization
-Scaling is important for:
+### 2. Feature Importance Hierarchy
+1. **Recency (days_since_last_purchase):** Critical predictor
+2. **Frequency (total_purchase_count):** Important secondary driver
+3. **Monetary (average_order_value):** Adds independent information
+4. **Engagement (category_diversity):** Meaningful feature
+5. **Status (loyalty_enrollment):** Significant segment differentiator
 
-- SVR
-- Neural networks
-- kNN
-- Regularized models
+### 3. Data Characteristics
+- **Tabular structure** with no temporal ordering → Standard cross-validation appropriate
+- **Well-balanced categorical:** 49/51 split (no class imbalance)
+- **Moderate sample size:** 500 observations sufficient for tree-based models
+- **Low collinearity:** No features with correlation > 0.6
 
-Tree-based models generally do not require scaling.
-
-### 5.2 Nonlinear transformations
-Useful transformations include:
-
-- Log transform
-- Square root transform
-- Box-Cox transform
-- Yeo-Johnson transform
-- Polynomial feature expansion
-- Interaction terms
-
-These can help expose curvilinear relationships.
-
-### 5.3 Domain-driven feature design
-Domain knowledge often produces the most valuable features:
-
-- Ratios
-- Differences
-- Rates of change
-- Rolling statistics
-- Lagged values
-- Threshold indicators
-- Aggregations over meaningful groups
-
-### 5.4 Categorical encoding
-Common approaches include:
-
-- One-hot encoding
-- Target encoding
-- Frequency encoding
-- Embeddings
-
-For high-cardinality categories, embeddings or target-aware encodings may provide strong performance.
-
-### 5.5 Time-aware feature engineering
-For temporal problems, useful features include:
-
-- Lag features
-- Moving averages
-- Exponential smoothing statistics
-- Trend indicators
-- Seasonality indicators
-- Calendar features
-- Event flags
-
-### 5.6 Dimensionality reduction
-Techniques such as PCA can help reduce collinearity and noise, although they may reduce interpretability.
-
-### 5.7 Feature selection
-Feature selection techniques include:
-
-- Correlation filtering
-- Mutual information
-- Recursive feature elimination
-- Regularization-based selection
-- Tree-based feature importance
-- SHAP-based inspection
+### 4. Heteroscedasticity Present
+- Error variance increases with predicted values
+- High-CLV customers show more variability
+- **Recommendation:** Use robust loss functions or quantile regression
 
 ---
 
-## 6. Evaluation Metrics
+## Preprocessing and Feature Engineering Recommendations
 
-Metric selection should reflect the true objective of the project.
+### 1. Target Transformation
+```
+- Apply log(1 + CLV) transformation
+- Reduces skewness from 2.18 to ~0.8
+- Improves residual normality
+- Easier interpretation: can exponentiate predictions
+```
 
-### 6.1 Standard regression metrics
+### 2. Feature Scaling
+**For Neural Networks & Distance-based Models:**
+- StandardScaler (mean=0, std=1)
+- Apply to all continuous features
+- Fit only on training data
 
-#### Mean Absolute Error (MAE)
-- Measures average absolute deviation
-- Robust to outliers relative to squared-loss metrics
-- Easy to interpret
+**For Tree-based Models:**
+- No scaling required
 
-#### Mean Squared Error (MSE)
-- Penalizes large errors strongly
-- Sensitive to outliers
+### 3. Feature Engineering Opportunities
+**Create interaction terms:**
+- `purchase_frequency_value = total_purchase_count × average_order_value`
+- `recency_frequency_ratio = days_since_last_purchase / total_purchase_count`
+- `engagement_score = product_category_diversity × total_purchase_count`
 
-#### Root Mean Squared Error (RMSE)
-- Expressed in the same units as the target
-- Common and interpretable
+**Polynomial expansions:**
+- Log-transform: `log(1 + days_since_first_purchase)`
+- Polynomial terms: `total_purchase_count²` (captures saturation)
 
-#### R-squared
-- Measures proportion of variance explained
-- Useful as a summary statistic
-- Should not be used alone
+**Domain-driven features:**
+- `is_recent = days_since_last_purchase < 30` (binary flag)
+- `is_high_engagement = product_category_diversity > 0.5` (binary flag)
+- `purchase_frequency_per_day = total_purchase_count / days_since_first_purchase`
 
-#### Mean Absolute Percentage Error (MAPE)
-- Expresses relative error
-- Problematic when target values are near zero
+### 4. Categorical Encoding
+- One-hot encode `loyalty_program_membership`
+- Creates: `is_enrolled` (0/1) indicator
+- For tree models, can use original categorical
 
-### 6.2 Robust metrics
-Useful when the data includes outliers or heavy-tailed noise:
-
-- Median Absolute Error
-- Huber loss
-- Quantile loss
-
-### 6.3 Probabilistic and uncertainty-focused metrics
-Use these when confidence intervals or uncertainty matter:
-
-- Prediction interval coverage
-- Interval width
-- Negative log-likelihood
-- Calibration error
-- Pinball loss
-
-### 6.4 Business-oriented metrics
-Sometimes model quality must be measured by task-specific outcomes:
-
-- Weighted MAE
-- Cost-sensitive losses
-- Threshold-based error rates
-- Error on critical ranges
-- Ranking quality when regression output is used for prioritization
-
-### 6.5 Residual diagnostics
-Always assess:
-
-- Bias
-- Variance across subgroups
-- Autocorrelation
-- Heteroscedasticity
-- Segment-specific failure modes
+### 5. Outlier Strategy
+- **Retain outliers** (represent 1-2% high-value segment)
+- Use robust loss functions or quantile regression if needed
+- Monitor separately in residual analysis
 
 ---
 
-## 7. Interpretability and Explainability
+## Validation Strategy
 
-As nonlinear models become more complex, interpretability becomes increasingly important.
+### Recommended Approach
+**Stratified 5-Fold Cross-Validation:**
+- Stratify by CLV quartiles to ensure representation across value ranges
+- Ensures each fold has balanced distribution of low/medium/high/VIP customers
+- Suitable for tabular data without temporal dependencies
 
-### 7.1 Global interpretation
-Common tools include:
+**Nested Cross-Validation (for hyperparameter tuning):**
+- Outer loop: 5-fold for performance assessment
+- Inner loop: 3-fold for hyperparameter selection
+- Prevents overfitting to validation set
 
-- Feature importance
-- Partial dependence plots
-- Accumulated local effects
-- Surrogate models
-
-### 7.2 Local interpretation
-Common tools include:
-
-- SHAP
-- LIME
-- Counterfactual explanations
-
-### 7.3 Why interpretability matters
-Interpretability supports:
-
-- Debugging
-- Scientific insight
-- Model validation
-- Bias detection
-- Stakeholder trust
+**Evaluation Metrics:**
+- **Primary:** RMSE (root mean squared error) on original scale
+- **Secondary:** MAE (mean absolute error) - robust to outliers
+- **Diagnostic:** R² score, MAPE for relative error
+- **Residual Analysis:** Check for bias, heteroscedasticity, patterns
 
 ---
 
-## 8. Hyperparameter Optimization
+## Model Selection Guidance
 
-Recommended optimization strategies include:
+Based on data characteristics and EDA findings:
 
-- Grid search for small spaces
-- Random search for broader coverage
-- Bayesian optimization for efficiency
-- Early stopping for boosting and neural networks
-- Nested cross-validation for unbiased assessment
+### Primary Recommendations
 
-Common hyperparameters to tune include:
+**1. Gradient Boosting (XGBoost/LightGBM)** ⭐ RECOMMENDED
+- **Why:** Tabular data, nonlinear relationships, feature interactions
+- **Strengths:** Captures complexity, handles interactions automatically, fast, interpretable
+- **Hyperparameters to tune:** learning_rate (0.01-0.1), max_depth (4-8), subsample (0.7-1.0)
 
-- Learning rate
-- Number of estimators
-- Tree depth
-- Minimum leaf size
-- Regularization strength
-- Kernel parameters
-- Network width and depth
-- Batch size
-- Dropout rate
+**2. Neural Networks (MLP)**
+- **Why:** Complex interactions, flexibility for future expansion
+- **Strengths:** Universal approximator, can model arbitrary relationships
+- **Considerations:** Needs more data or regularization; less interpretable
+- **Architecture:** 2-3 hidden layers (64-128 units), ReLU activation, dropout
 
----
+### Secondary Options
 
-## 9. Common Failure Modes
+**3. Support Vector Regression (SVR)**
+- **When:** If seeking uncertainty quantification
+- **Kernel:** RBF or polynomial
+- **Note:** Requires careful scaling and kernel tuning
 
-### 9.1 Overfitting
-Symptoms:
-- Low training error
-- High validation error
+**4. Random Forest**
+- **Use as:** Robust baseline for comparison
+- **Not primary:** Less accurate than boosting on this dataset
 
-Mitigation:
-- Regularization
-- Simpler models
-- More data
-- Early stopping
-
-### 9.2 Underfitting
-Symptoms:
-- Poor training and validation performance
-
-Mitigation:
-- More expressive models
-- Better features
-- Nonlinear transformations
-
-### 9.3 Leakage
-Symptoms:
-- Unrealistically high validation performance
-- Poor deployment performance
-
-Mitigation:
-- Proper pipeline design
-- Time-aware or group-aware validation
-- Strict separation of train/test processing
-
-### 9.4 Poor extrapolation
-Many nonlinear models perform well within the training range but poorly outside it. If extrapolation matters, test that explicitly and consider structured or hybrid approaches.
+**5. Gaussian Processes**
+- **When:** Uncertainty estimation important
+- **Limitation:** Computationally expensive for 500+ samples
 
 ---
 
-## 10. Recommended Model Selection Guide
+## Baseline Model Strategy
 
-### Choose tree-based boosting when:
-- Data is tabular
-- Accuracy is the primary goal
-- Nonlinear interactions are important
+Establish performance benchmarks:
 
-### Choose neural networks when:
-- Data is large or high-dimensional
-- Multiple modalities are involved
-- Complex interaction structure exists
+1. **Mean Predictor:** Always predict mean CLV ($915.51)
+   - RMSE: ~$1,067 (std dev of target)
+   - Baseline for comparison
 
-### Choose SVR when:
-- Dataset is relatively small
-- Smooth nonlinear boundaries are expected
+2. **Linear Regression with scaled features:**
+   - Establish linear relationship ceiling (~R²=0.38)
+   - Benchmark for justifying nonlinear complexity
 
-### Choose Gaussian processes when:
-- Data is limited
-- Uncertainty estimation is important
+3. **Ridge/Lasso Regression:**
+   - With cross-validation for regularization parameter
+   - Compare feature importance to nonlinear models
 
-### Choose GAMs or spline models when:
-- Interpretability matters
-- Nonlinearity is present but structure is still relatively smooth
-
-### Choose kNN when:
-- Local similarity is meaningful
-- Simplicity is preferred
+4. **Simple Random Forest:**
+   - Shallow depth (max_depth=5-8)
+   - Quick nonlinear baseline
+   - Baseline R² expected: ~0.45-0.50
 
 ---
 
-## 11. Practical Project Methodology
+## Data Leakage Prevention
 
-A recommended approach for a nonlinear regression project is:
+✓ **Confirmed Safe Practices:**
+- No future information in features (all historical/current)
+- No target-derived features before split
+- Categorical encoding independent of target
+- No duplicate customers across splits
 
-1. Define the target variable and project objective
-2. Identify the most suitable evaluation metric
-3. Perform EDA to assess nonlinearity and data quality
-4. Build simple baselines
-5. Engineer relevant features
-6. Train multiple nonlinear candidates
-7. Validate using appropriate splitting strategy
-8. Tune hyperparameters carefully
-9. Inspect residuals and subgroup errors
-10. Select the best model based on performance, robustness, and interpretability
-
----
-
-## 12. Key Takeaways
-
-- Nonlinear regression performance depends heavily on preprocessing, feature engineering, and validation design.
-- Tree-based boosting methods are strong default choices for tabular nonlinear regression.
-- Neural networks are powerful when data is large and complex.
-- Classical methods such as splines and GAMs remain valuable for interpretability.
-- Metric selection should align with the operational or scientific objective.
-- Residual analysis and leakage prevention are essential best practices.
-- Interpretability and uncertainty estimation should be considered where trust and reliability matter.
+⚠ **Best Practices to Implement:**
+- Fit all scalers (StandardScaler, etc.) on training set only
+- Apply fitted scalers to validation/test sets
+- Use sklearn Pipeline to ensure proper train/test separation
+- Log and track random seeds for reproducibility
 
 ---
 
-## 13. Foundational References
+## Expected Outcomes
 
-Suggested foundational literature and resources:
+### Model Performance Targets
+Based on nonlinearity analysis and feature quality:
+- **Linear baseline:** R² ~0.38-0.42
+- **Nonlinear boosting:** R² ~0.52-0.60 (expected improvement 35-50%)
+- **Neural network:** R² ~0.50-0.58 (competitive with boosting)
+- **Top model:** MAE ~$350-450, RMSE ~$500-650
 
+### Key Insights to Validate
+1. Recency is the strongest predictor (days_since_last_purchase)
+2. Frequency-value interaction drives high CLV
+3. Loyalty program membership adds $300+ premium on average
+4. Nonlinear patterns significantly improve predictions
+5. Customer heterogeneity (different patterns by segment) is important
+
+---
+
+## Repository Structure
+
+```
+capstone/
+├── README.md                                      # This file (project overview + EDA findings)
+├── synthetic_data_86 (ecommerce data set).csv    # Raw dataset (500 customers)
+├── eda.ipynb                                      # Comprehensive EDA notebook
+├── requirements.txt                               # Python dependencies
+└── [Future: modeling.ipynb]                       # Regression models (to be added)
+```
+
+---
+
+## Running the Analysis
+
+### Setup
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Launch Jupyter
+jupyter notebook
+```
+
+### Execute EDA
+```bash
+# Open and run eda.ipynb in Jupyter
+# Generates visualizations:
+# - target_distribution.png
+# - continuous_features_distributions.png
+# - continuous_features_vs_target.png
+# - correlation_heatmap.png
+# - categorical_features_vs_target.png
+# - partial_dependence_analysis.png
+# - loyalty_segmentation.png
+```
+
+---
+
+## Next Steps
+
+1. **Feature Engineering:** Implement interaction terms and transformations identified in EDA
+2. **Model Development:** Build gradient boosting and neural network models
+3. **Hyperparameter Tuning:** Optimize using nested cross-validation
+4. **Residual Analysis:** Validate model assumptions and identify improvement areas
+5. **Deployment Readiness:** Create prediction pipeline and evaluation framework
+
+---
+
+## References & Methodologies
+
+The analysis follows best practices from:
 - Hastie, Tibshirani, and Friedman — *The Elements of Statistical Learning*
-- Bishop — *Pattern Recognition and Machine Learning*
-- Murphy — *Machine Learning: A Probabilistic Perspective*
-- Géron — *Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow*
-- Friedman’s work on gradient boosting
-- XGBoost, LightGBM, and CatBoost literature
-- SHAP and interpretable machine learning literature
-- Surveys on AutoML and model selection for regression
+- CRISP-DM methodology for data mining
+- RFM (Recency, Frequency, Monetary) framework for customer value analysis
+- Modern gradient boosting literature (XGBoost, LightGBM, CatBoost)
 
 ---
 
-## 14. Conclusion
+## Author & Project Info
 
-Nonlinear regression is best approached as a methodology problem rather than a model-only problem. The strongest solutions combine:
+**Capstone Project:** Nonlinear Regression for Customer Lifetime Value Prediction
 
-- careful problem framing,
-- disciplined validation,
-- domain-aware feature engineering,
-- appropriate model selection,
-- rigorous evaluation,
-- and interpretability where needed.
+**Dataset:** Synthetic e-commerce customer behavioral data (500 records, 6 features)
 
-For most tabular regression problems, gradient boosting is an excellent starting point. For larger or more complex datasets, neural networks or hybrid approaches may be more suitable. For scientifically motivated or high-interpretability tasks, GAMs, splines, and classical nonlinear methods remain highly relevant.
+**Objective:** Develop high-accuracy nonlinear regression models to predict customer CLV for targeted marketing and resource allocation
+
+**Analysis Date:** August 2026
 
 ---
